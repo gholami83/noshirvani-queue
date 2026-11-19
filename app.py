@@ -1,15 +1,13 @@
 import json
 import sqlite3
-from gevent import monkey
-monkey.patch_all()
-from engineio.async_drivers import gevent
+
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'noshirvani-babol-secret-2025'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 with open('config.json', 'r', encoding='utf-8') as f:
     CONFIG = json.load(f)
