@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>داشبورد پذیرش</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body class="p-4 md:p-8 relative">
+
+<button class="theme-toggle" id="themeToggle" title="تغییر تم">☀️</button>
+
+<header class="flex justify-between items-center mb-8 relative z-10">
+    <div>
+        <h1 class="text-2xl font-extrabold">🏛️ پذیرش — {{ name }}</h1>
+        <p class="text-sm text-blue-accent mt-1">{{ uni }}</p>
+    </div>
+    <div class="text-left flex items-center gap-4">
+        <div id="liveClock" class="text-xl font-bold text-blue-accent">--:--:--</div>
+        <a href="/logout" class="text-xs text-muted hover:opacity-80">خروج</a>
+    </div>
+</header>
+
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
+    <div class="glass stat-card p-5">
+        <div class="text-muted text-sm mb-1">در انتظار</div>
+        <div id="waiting_count" class="text-3xl font-extrabold text-yellow-accent">۰</div>
+    </div>
+    <div class="glass stat-card p-5">
+        <div class="text-muted text-sm mb-1">در حال رسیدگی</div>
+        <div id="serving_count" class="text-3xl font-extrabold text-green-accent">۰</div>
+    </div>
+    <div class="glass stat-card p-5">
+        <div class="text-muted text-sm mb-1">کل رسیدگی‌شده</div>
+        <div id="served_total" class="text-3xl font-extrabold text-purple-accent">۰</div>
+    </div>
+    <div class="glass stat-card p-5">
+        <div class="text-muted text-sm mb-1">پذیرش آنلاین</div>
+        <div id="online_reception" class="text-3xl font-extrabold text-blue-accent">۰</div>
+    </div>
+</section>
+
+<div class="grid md:grid-cols-3 gap-6 relative z-10 pb-8">
+
+    <!-- صدور نوبت -->
+    <div class="md:col-span-1 glass p-6">
+        <h2 class="text-lg font-bold mb-3">🎫 صدور نوبت خودکار</h2>
+        <p class="text-xs text-muted mb-4 leading-6">
+            شماره خودکار صادر می‌شه و وارد <strong class="text-blue-accent">صف مشترک</strong> می‌شه.
+            هر باجه‌ای که خالی باشه، نوبت بعدی رو می‌گیره.
+        </p>
+        <form id="issueForm">
+            <button class="btn-primary w-full p-5 rounded-xl text-lg">
+                ➕ نوبت بعدی رو صادر کن
+            </button>
+        </form>
+        <div id="lastIssued" class="mt-4 text-center hidden">
+            <div class="text-muted text-xs mb-1">آخرین نوبت صادرشده</div>
+            <div class="text-5xl font-extrabold text-blue-accent" id="lastNumber">—</div>
+        </div>
+    </div>
+
+    <!-- صف -->
+    <div class="md:col-span-1 glass p-6">
+        <h2 class="text-lg font-bold mb-3">📋 صف در انتظار</h2>
+        <div id="queueList" class="max-h-96 overflow-y-auto"></div>
+    </div>
+
+    <!-- باجه‌ها -->
+    <div class="md:col-span-1 glass p-6">
+        <h2 class="text-lg font-bold mb-3">🏦 وضعیت باجه‌ها</h2>
+        <div class="overflow-x-auto">
+            <table class="queue-table">
+                <thead>
+                    <tr><th>#</th><th>باجه</th><th>وضعیت</th><th>نوبت</th></tr>
+                </thead>
+                <tbody id="countersList"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+    registerAs('reception');
+
+    document.getElementById('issueForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        socket.emit('issue_ticket', {});
+    });
+
+    socket.on('issue_ok', d => toast('✅ ' + d.msg, 'ok'));
+
+    socket.on('ticket_issued', (d) => {
+        document.getElementById('lastIssued').classList.remove('hidden');
+        document.getElementById('lastNumber').textContent = toPersianDigits(d.number);
+    });
+</script>
+</body>
+</html>

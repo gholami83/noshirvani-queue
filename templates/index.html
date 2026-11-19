@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>ورود — سامانه نوبت‌دهی</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex items-center justify-center p-4 min-h-screen relative">
+
+<button class="theme-toggle" id="themeToggle" title="تغییر تم">☀️</button>
+
+<div class="glass p-8 md:p-10 w-full max-w-md relative z-10">
+    <div class="text-center mb-8">
+        <div class="text-5xl mb-3">🎓</div>
+        <h1 class="text-2xl font-extrabold mb-2">سامانه نوبت‌دهی</h1>
+        <p class="text-sm text-blue-accent">{{ uni }}</p>
+    </div>
+
+    {% if error %}
+    <div class="rounded-xl p-3 mb-5 text-sm text-center"
+         style="background: rgba(220,38,38,0.12); border: 1px solid rgba(220,38,38,0.4); color: #fca5a5">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" class="space-y-4">
+        <div>
+            <label class="block text-sm text-secondary mb-2">نام کاربری</label>
+            <input name="username" required
+                   class="input-dark w-full p-3 rounded-xl"
+                   placeholder="مثلاً reception1">
+        </div>
+        <div>
+            <label class="block text-sm text-secondary mb-2">رمز عبور</label>
+            <input name="password" type="password" required
+                   class="input-dark w-full p-3 rounded-xl"
+                   placeholder="••••">
+        </div>
+        <button class="btn-primary w-full p-3 rounded-xl mt-2">
+            ورود به سامانه
+        </button>
+    </form>
+
+    <div class="mt-6 text-xs text-muted text-center leading-6">
+        <div>👤 پذیرش: <code>reception1</code> / <code>reception2</code></div>
+        <div>🏦 باجه‌ها: <code>counter1</code> / <code>counter2</code> / <code>counter3</code></div>
+        <div>📢 مجری: <code>announcer</code></div>
+        <div class="mt-1 text-blue-accent">رمز همه: 1234</div>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>داشبورد مجری</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body class="p-4 md:p-6 relative min-h-screen">
+
+<button class="theme-toggle" id="themeToggle" title="تغییر تم">☀️</button>
+
+<header class="flex justify-between items-center mb-6 relative z-10">
+    <div>
+        <h1 class="text-xl md:text-2xl font-extrabold">📢 مجری — {{ name }}</h1>
+        <p class="text-sm text-blue-accent mt-1">{{ uni }}</p>
+    </div>
+    <div class="text-left flex items-center gap-3">
+        <button id="testAudioBtn" class="btn-outline rounded-full px-3 h-10 flex items-center justify-center text-xs" title="تست صدا">
+            🎵 تست صدا
+        </button>
+        <button id="ttsToggle" class="btn-outline rounded-full w-10 h-10 flex items-center justify-center text-lg" title="روشن/خاموش صدا">🔊</button>
+        <div id="liveClock" class="text-lg md:text-xl font-bold text-blue-accent">--:--:--</div>
+        <a href="/logout" class="text-xs text-muted hover:opacity-80">خروج</a>
+    </div>
+</header>
+
+<!-- ═══════════ کارت اصلی: نوبت + صف اعلان ═══════════ -->
+<div class="grid md:grid-cols-3 gap-4 mb-6 relative z-10">
+
+    <!-- نوبت فعال (بزرگ‌ترین) -->
+    <div class="md:col-span-2 big-ticket-card" style="padding: 2.5rem 1.5rem">
+        <div class="big-ticket-label">نوبت در حال خواندن</div>
+        <div class="big-ticket-number announce-glow idle" id="bigCurrent" style="color: var(--accent-blue)">—</div>
+        <div class="big-ticket-sub text-lg font-bold text-green-accent mt-2" id="bigCounter"></div>
+
+        <!-- صف اعلان -->
+        <div id="announceQueueBox" class="mt-4 hidden">
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full"
+                 style="background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.4)">
+                <span class="text-sm text-yellow-accent">⏳ در صف اعلان:</span>
+                <span id="announceQueueCount" class="font-bold text-yellow-accent text-lg">۰</span>
+                <span class="text-sm text-yellow-accent">نوبت</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- آمار پذیرش — کارت ویژه مجری -->
+    <div class="glass p-4 flex flex-col justify-between"
+         style="background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(147,51,234,0.1)); border-color: rgba(99,102,241,0.4)">
+        <div>
+            <div class="text-xs font-bold text-purple-accent mb-3 uppercase tracking-wide">👥 وضعیت پذیرش</div>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-secondary">پذیرش آنلاین</span>
+                    <span id="online_reception" class="text-3xl font-extrabold text-blue-accent">۰</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-secondary">مجری آنلاین</span>
+                    <span id="online_announcer" class="text-3xl font-extrabold text-green-accent">۰</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-secondary">باجه آنلاین</span>
+                    <span id="online_counter" class="text-3xl font-extrabold text-purple-accent">۰</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ آمار ۳تایی (کم‌کنتراست) ═══════════ -->
+<section class="grid grid-cols-3 gap-3 mb-6 relative z-10">
+    <div class="glass p-4">
+        <div class="text-muted text-xs mb-1">در انتظار</div>
+        <div id="waiting_count" class="text-2xl font-extrabold text-yellow-accent">۰</div>
+    </div>
+    <div class="glass p-4">
+        <div class="text-muted text-xs mb-1">در حال رسیدگی</div>
+        <div id="serving_count" class="text-2xl font-extrabold text-green-accent">۰</div>
+    </div>
+    <div class="glass p-4">
+        <div class="text-muted text-xs mb-1">کل رسیدگی‌شده</div>
+        <div id="served_total" class="text-2xl font-extrabold text-purple-accent">۰</div>
+    </div>
+</section>
+
+<!-- ═══════════ پایین: صف + باجه‌ها + تاریخچه ═══════════ -->
+<div class="grid md:grid-cols-3 gap-4 relative z-10 pb-8">
+
+    <div class="glass p-5">
+        <h2 class="text-base font-bold mb-3">📋 صف در انتظار</h2>
+        <div id="queueList" class="max-h-72 overflow-y-auto"></div>
+    </div>
+
+    <div class="glass p-5">
+        <h2 class="text-base font-bold mb-3">🏦 وضعیت باجه‌ها</h2>
+        <div class="overflow-x-auto">
+            <table class="queue-table">
+                <thead>
+                    <tr><th>#</th><th>باجه</th><th>وضعیت</th><th>نوبت</th></tr>
+                </thead>
+                <tbody id="countersList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="glass p-5">
+        <h2 class="text-base font-bold mb-3">🔔 آخرین اعلان‌ها</h2>
+        <div id="announceHistory" class="max-h-72 overflow-y-auto">
+            <div class="text-muted text-center py-4 text-sm">هنوز اعلانی نداشته</div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+    registerAs('announcer');
+</script>
+</body>
+</html>

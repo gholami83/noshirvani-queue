@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>داشبورد باجه</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body class="p-4 md:p-6 relative min-h-screen">
+
+<button class="theme-toggle" id="themeToggle" title="تغییر تم">☀️</button>
+
+<header class="flex justify-between items-center mb-6 relative z-10">
+    <div>
+        <h1 class="text-xl md:text-2xl font-extrabold">🏦 {{ counter_name }}</h1>
+        <p class="text-sm text-muted mt-1">{{ name }} — {{ uni }}</p>
+    </div>
+    <div class="text-left flex items-center gap-3">
+        <button id="ttsToggle" class="btn-outline rounded-full w-10 h-10 flex items-center justify-center text-lg" title="روشن/خاموش کردن صدا">🔊</button>
+        <button id="testAudioBtn" class="btn-outline rounded-full px-3 h-10 flex items-center justify-center text-xs" title="تست صدا">
+    🎵 تست صدا
+</button>
+        <div id="liveClock" class="text-lg md:text-xl font-bold text-blue-accent">--:--:--</div>
+        <a href="/logout" class="text-xs text-muted hover:opacity-80">خروج</a>
+    </div>
+</header>
+
+<!-- کارت اصلی -->
+<section class="relative z-10 mb-6">
+    <div class="big-ticket-card">
+        <div class="big-ticket-label">نوبت در حال رسیدگی</div>
+        <div class="big-ticket-number idle" id="myCurrent">—</div>
+        <div class="big-ticket-sub" id="myCurrentSub">در انتظار نوبت...</div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6 max-w-lg mx-auto">
+            <button id="callNextBtn" class="btn-green p-4 rounded-xl text-lg">
+                🔔 نوبت بعدی را بگیر
+            </button>
+            <button id="finishBtn" class="btn-outline p-4 rounded-xl text-lg" disabled>
+                ✅ اتمام رسیدگی
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- آمار -->
+<section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 relative z-10">
+    <div class="glass p-4">
+        <div class="text-muted text-xs mb-1">در انتظار</div>
+        <div id="waiting_count" class="text-2xl font-extrabold text-yellow-accent">۰</div>
+    </div>
+    <div class="glass p-4">
+        <div class="text-muted text-xs mb-1">در حال رسیدگی</div>
+        <div id="serving_count" class="text-2xl font-extrabold text-green-accent">۰</div>
+    </div>
+    <div class="glass p-4">
+        <div class="text-muted text-xs mb-1">کل رسیدگی‌شده</div>
+        <div id="served_total" class="text-2xl font-extrabold text-purple-accent">۰</div>
+    </div>
+    <div class="glass p-4">
+        <div class="text-muted text-xs mb-1">باجه‌های آنلاین</div>
+        <div id="online_counter" class="text-2xl font-extrabold text-blue-accent">۰</div>
+    </div>
+</section>
+
+<!-- پایین: صف + باجه‌ها -->
+<div class="grid md:grid-cols-2 gap-4 relative z-10 pb-8">
+    <div class="glass p-5">
+        <h2 class="text-base font-bold mb-3">📋 صف در انتظار</h2>
+        <div id="queueList" class="max-h-64 overflow-y-auto"></div>
+    </div>
+    <div class="glass p-5">
+        <h2 class="text-base font-bold mb-3">🏦 وضعیت باجه‌ها</h2>
+        <div class="overflow-x-auto">
+            <table class="queue-table">
+                <thead>
+                    <tr><th>#</th><th>باجه</th><th>وضعیت</th><th>نوبت</th></tr>
+                </thead>
+                <tbody id="countersList"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+    const COUNTER_ID = {{ counter_id }};
+    window.myCounterId = COUNTER_ID;
+
+    registerAs('counter', COUNTER_ID);
+
+    document.getElementById('callNextBtn').onclick = () =>
+        socket.emit('call_next', { counter_id: COUNTER_ID });
+
+    document.getElementById('finishBtn').onclick = () =>
+        socket.emit('finish_current', { counter_id: COUNTER_ID });
+</script>
+</body>
+</html>

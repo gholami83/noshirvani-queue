@@ -1,0 +1,17 @@
+{
+  "users": {
+    "admin":      { "pass": "admin123", "role": "admin",     "name": "مدیر سیستم" },
+    "reception1": { "pass": "1234", "role": "reception", "name": "پذیرش ۱" },
+    "reception2": { "pass": "1234", "role": "reception", "name": "پذیرش ۲" },
+    "counter1":   { "pass": "1234", "role": "counter",   "name": "باجه ۱", "counter_id": 1 },
+    "counter2":   { "pass": "1234", "role": "counter",   "name": "باجه ۲", "counter_id": 2 },
+    "counter3":   { "pass": "1234", "role": "counter",   "name": "باجه ۳", "counter_id": 3 },
+    "announcer":  { "pass": "1234", "role": "announcer", "name": "مجری" }
+  },
+  "counters": [
+    { "id": 1, "name": "باجه شماره ۱ — ثبت‌نام" },
+    { "id": 2, "name": "باجه شماره ۲ — امور دانشجویی" },
+    { "id": 3, "name": "باجه شماره ۳ — آموزش" }
+  ],
+  "university": "دانشگاه صنعتی نوشیروانی بابل"
+}

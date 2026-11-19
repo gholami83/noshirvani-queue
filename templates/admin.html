@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>پنل ادمین</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body class="p-4 md:p-8 relative">
+
+<button class="theme-toggle" id="themeToggle" title="تغییر تم">☀️</button>
+
+<header class="flex justify-between items-center mb-8 relative z-10">
+    <div>
+        <h1 class="text-2xl font-extrabold">⚙️ پنل مدیریت — {{ name }}</h1>
+        <p class="text-sm text-blue-accent mt-1">{{ uni }}</p>
+    </div>
+    <div class="text-left flex items-center gap-3">
+        <div id="liveClock" class="text-xl font-bold text-blue-accent">--:--:--</div>
+        <a href="/logout" class="text-xs text-muted hover:opacity-80">خروج</a>
+    </div>
+</header>
+
+<!-- آمار کلی -->
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
+    <div class="glass stat-card p-5">
+        <div class="text-muted text-sm mb-1">در انتظار</div>
+        <div id="waiting_count" class="text-3xl font-extrabold text-yellow-accent">۰</div>
+    </div>
+    <div class="glass stat-card p-5">
+        <div class="text-muted text-sm mb-1">در حال رسیدگی</div>
+        <div id="serving_count" class="text-3xl font-extrabold text-green-accent">۰</div>
+    </div>
+    <div class="glass stat-card p-5">
+        <div class="text-muted text-sm mb-1">کل رسیدگی‌شده</div>
+        <div id="served_total" class="text-3xl font-extrabold text-purple-accent">۰</div>
+    </div>
+    <div class="glass stat-card p-5">
+        <div class="text-muted text-sm mb-1">آنلاین‌ها</div>
+        <div class="text-xs text-secondary mt-2 space-y-1">
+            <div>پذیرش: <span id="online_reception" class="font-bold text-blue-accent">۰</span></div>
+            <div>مجری: <span id="online_announcer" class="font-bold text-blue-accent">۰</span></div>
+            <div>باجه: <span id="online_counter" class="font-bold text-blue-accent">۰</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- ۳ ستون مدیریت -->
+<div class="grid md:grid-cols-3 gap-6 relative z-10 pb-8">
+
+    <!-- ستون ۱: باجه‌ها -->
+    <div class="glass p-5">
+        <h2 class="text-lg font-bold mb-4">🏦 مدیریت باجه‌ها</h2>
+
+        <form id="addCounterForm" class="space-y-2 mb-4">
+            <input name="name" required placeholder="نام باجه (مثلاً باجه ۴ — مشاوره)"
+                   class="input-dark w-full p-2 rounded-lg text-sm">
+            <button class="btn-green w-full p-2 rounded-lg text-sm">➕ افزودن باجه</button>
+        </form>
+
+        <div id="countersAdminList" class="space-y-2 max-h-96 overflow-y-auto">
+            {% for c in counters %}
+            <div class="flex justify-between items-center p-2 rounded-lg"
+                 style="background: var(--surface-hover)">
+                <div class="flex-1">
+                    <div class="font-bold text-sm">{{ c.name }}</div>
+                    <div class="text-xs text-muted">
+                        شناسه: {{ c.id }} —
+                        {% if c.is_active %}
+                        <span class="text-green-accent">فعال</span>
+                        {% else %}
+                        <span style="color: #ef4444">غیرفعال</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if c.is_active %}
+                <button class="delete-counter-btn text-xs px-2 py-1 rounded"
+                        style="background: rgba(239,68,68,0.15); color: #ef4444"
+                        data-id="{{ c.id }}" data-name="{{ c.name }}">🗑️</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ستون ۲: کاربران -->
+    <div class="glass p-5">
+        <h2 class="text-lg font-bold mb-4">👥 مدیریت کاربران</h2>
+
+        <form id="addUserForm" class="space-y-2 mb-4">
+            <div class="grid grid-cols-2 gap-2">
+                <input name="username" required placeholder="نام کاربری"
+                       class="input-dark p-2 rounded-lg text-sm">
+                <input name="password" required placeholder="رمز"
+                       class="input-dark p-2 rounded-lg text-sm">
+            </div>
+            <input name="name" required placeholder="نام نمایشی"
+                   class="input-dark w-full p-2 rounded-lg text-sm">
+            <select name="role" required id="roleSelect" class="input-dark w-full p-2 rounded-lg text-sm">
+                <option value="reception">پذیرش</option>
+                <option value="counter">باجه</option>
+                <option value="announcer">مجری</option>
+                <option value="admin">ادمین</option>
+            </select>
+            <select name="counter_id" class="input-dark w-full p-2 rounded-lg text-sm">
+                <option value="">— انتخاب باجه (فقط برای نقش باجه) —</option>
+                {% for c in counters %}
+                {% if c.is_active %}
+                <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+            <button class="btn-primary w-full p-2 rounded-lg text-sm">➕ افزودن کاربر</button>
+        </form>
+
+        <div id="usersAdminList" class="space-y-2 max-h-96 overflow-y-auto">
+            {% for u in users %}
+            <div class="flex justify-between items-center p-2 rounded-lg"
+                 style="background: var(--surface-hover)">
+                <div class="flex-1">
+                    <div class="font-bold text-sm">{{ u.username }}</div>
+                    <div class="text-xs text-muted">
+                        {{ u.name }} —
+                        {% if u.role == 'admin' %}👑 ادمین
+                        {% elif u.role == 'reception' %}👤 پذیرش
+                        {% elif u.role == 'counter' %}🏦 باجه {% if u.counter_id %}({{ u.counter_id }}){% endif %}
+                        {% elif u.role == 'announcer' %}📢 مجری
+                        {% endif %}
+                    </div>
+                </div>
+                {% if u.role != 'admin' %}
+                <button class="delete-user-btn text-xs px-2 py-1 rounded"
+                        style="background: rgba(239,68,68,0.15); color: #ef4444"
+                        data-username="{{ u.username }}">🗑️</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ستون ۳: ریست -->
+    <div class="glass p-5">
+        <h2 class="text-lg font-bold mb-4">🔄 عملیات سیستم</h2>
+
+        <div class="space-y-3">
+            <button id="resetQueueBtn" class="btn-outline w-full p-3 rounded-lg text-sm text-right">
+                <div class="font-bold">🔄 ریست صف و آمار</div>
+                <div class="text-xs text-muted mt-1">همه نوبت‌ها پاک می‌شه، شماره‌ها ادامه پیدا می‌کنن</div>
+            </button>
+
+            <button id="resetAllBtn" class="w-full p-3 rounded-lg text-sm text-right"
+                    style="background: rgba(239,68,68,0.1); border: 2px solid rgba(239,68,68,0.4); color: #ef4444; cursor: pointer">
+                <div class="font-bold">⚠️ ریست کامل + شماره از ۱</div>
+                <div class="text-xs mt-1 opacity-80">صف پاک + شماره نوبت برمی‌گرده به 001</div>
+            </button>
+
+            <button id="refreshBtn" class="btn-primary w-full p-3 rounded-lg text-sm">
+                🔃 بروزرسانی داده‌ها
+            </button>
+        </div>
+
+        <div class="mt-6 pt-4" style="border-top: 1px solid var(--surface-border)">
+            <h3 class="text-sm font-bold mb-2 text-muted">📊 راهنما</h3>
+            <ul class="text-xs text-muted space-y-1 leading-6">
+                <li>• حذف باجه آن را غیرفعال می‌کند (نه پاک کامل)</li>
+                <li>• باجه غیرفعال در داشبوردها نمایش داده نمی‌شود</li>
+                <li>• برای افزودن پذیرش/مجری جدید، از فرم کاربران استفاده کن</li>
+                <li>• ادمین اصلی قابل حذف نیست</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- پایین: صف + باجه‌ها -->
+<div class="grid md:grid-cols-2 gap-6 relative z-10 pb-8">
+    <div class="glass p-6">
+        <h2 class="text-lg font-bold mb-4">📋 صف در انتظار</h2>
+        <div id="queueList" class="max-h-64 overflow-y-auto"></div>
+    </div>
+    <div class="glass p-6">
+        <h2 class="text-lg font-bold mb-4">🏦 وضعیت زنده باجه‌ها</h2>
+        <div class="overflow-x-auto">
+            <table class="queue-table">
+                <thead>
+                    <tr><th>#</th><th>باجه</th><th>وضعیت</th><th>نوبت</th></tr>
+                </thead>
+                <tbody id="countersList"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+    registerAs('admin');
+
+    // ═══════════ افزودن باجه ═══════════
+    document.getElementById('addCounterForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = e.target.name.value.trim();
+        if (!name) return;
+        socket.emit('admin_add_counter', { name });
+        e.target.reset();
+    });
+
+    // ═══════════ حذف باجه (با تایید) ═══════════
+    document.querySelectorAll('.delete-counter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.id;
+            const name = btn.dataset.name;
+            if (confirm(`باجه «${name}» غیرفعال شود؟`)) {
+                socket.emit('admin_delete_counter', { counter_id: id });
+            }
+        });
+    });
+
+    // ═══════════ افزودن کاربر ═══════════
+    document.getElementById('addUserForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const f = e.target;
+        socket.emit('admin_add_user', {
+            username: f.username.value.trim(),
+            password: f.password.value.trim(),
+            role: f.role.value,
+            name: f.name.value.trim(),
+            counter_id: f.counter_id.value || null,
+        });
+        f.reset();
+    });
+
+    // ═══════════ حذف کاربر ═══════════
+    document.querySelectorAll('.delete-user-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const u = btn.dataset.username;
+            if (confirm(`کاربر «${u}» حذف شود؟`)) {
+                socket.emit('admin_delete_user', { username: u });
+            }
+        });
+    });
+
+    // ═══════════ ریست صف ═══════════
+    document.getElementById('resetQueueBtn').addEventListener('click', () => {
+        if (confirm('همه نوبت‌ها پاک شود؟ (شماره از ادامه)')) {
+            socket.emit('admin_reset_queue', { reset_numbers: false });
+        }
+    });
+
+    // ═══════════ ریست کامل ═══════════
+    document.getElementById('resetAllBtn').addEventListener('click', () => {
+        if (confirm('⚠️ هشدار: صف پاک می‌شود و شماره نوبت به 001 برمی‌گردد. مطمئنی؟')) {
+            socket.emit('admin_reset_queue', { reset_numbers: true });
+        }
+    });
+
+    // ═══════════ بروزرسانی دستی ═══════════
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+        location.reload();
+    });
+
+    // ═══════════ نوتیفیکیشن ادمین ═══════════
+    socket.on('admin_ok', (d) => {
+        toast(d.msg, 'ok');
+        // بعد از موفقیت، صفحه رو رفرش کن تا لیست‌ها بروز بشن
+        setTimeout(() => location.reload(), 800);
+    });
+
+    // بعد از هر تغییر، لیست‌ها از سمت سرور رفرش می‌شن
+    socket.on('admin_refresh', () => {
+        // برای سادگی، فقط اگه صفحه فعاله، رفرش می‌کنیم
+        // (تو نسخه واقعی می‌تونی fetch کنی و DOM رو آپدیت کنی)
+    });
+</script>
+</body>
+</html>
