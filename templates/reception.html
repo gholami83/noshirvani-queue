@@ -17,12 +17,17 @@
         <h1 class="text-2xl font-extrabold">🏛️ پذیرش — {{ name }}</h1>
         <p class="text-sm text-blue-accent mt-1">{{ uni }}</p>
     </div>
-    <div class="text-left flex items-center gap-4">
+    <div class="text-left flex items-center gap-3">
+        <button id="testAudioBtn" class="btn-outline rounded-full px-3 h-10 flex items-center justify-center text-xs" title="تست صدا">
+            🎵 تست
+        </button>
+        <button id="ttsToggle" class="btn-outline rounded-full w-10 h-10 flex items-center justify-center text-lg" title="روشن/خاموش صدا">🔊</button>
         <div id="liveClock" class="text-xl font-bold text-blue-accent">--:--:--</div>
         <a href="/logout" class="text-xs text-muted hover:opacity-80">خروج</a>
     </div>
 </header>
 
+<!-- آمار -->
 <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
     <div class="glass stat-card p-5">
         <div class="text-muted text-sm mb-1">در انتظار</div>
@@ -44,27 +49,54 @@
 
 <div class="grid md:grid-cols-3 gap-6 relative z-10 pb-8">
 
-    <!-- صدور نوبت -->
+    <!-- صدور نوبت با انتخاب تاریخ -->
     <div class="md:col-span-1 glass p-6">
-        <h2 class="text-lg font-bold mb-3">🎫 صدور نوبت خودکار</h2>
+        <h2 class="text-lg font-bold mb-3">🎫 صدور نوبت</h2>
         <p class="text-xs text-muted mb-4 leading-6">
-            شماره خودکار صادر می‌شه و وارد <strong class="text-blue-accent">صف مشترک</strong> می‌شه.
-            هر باجه‌ای که خالی باشه، نوبت بعدی رو می‌گیره.
+            تاریخ نوبت رو انتخاب کن. هر روز شماره‌گذاری جدا داره (از ۰۰۱).
         </p>
-        <form id="issueForm">
-            <button class="btn-primary w-full p-5 rounded-xl text-lg">
+
+        <form id="issueForm" class="space-y-3">
+            <div>
+                <label class="block text-xs text-muted mb-1">تاریخ نوبت</label>
+                <input type="date" id="ticketDate" name="ticket_date" 
+                       value="{{ today }}" required
+                       class="input-dark w-full p-2 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs text-muted mb-1">یا انتخاب از تاریخ‌های موجود</label>
+                <select id="dateSelect" class="input-dark w-full p-2 rounded-lg text-sm">
+                    <option value="">— تاریخ‌های دارای نوبت —</option>
+                    {% for d in available_dates %}
+                    <option value="{{ d }}">{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="btn-primary w-full p-4 rounded-xl text-lg">
                 ➕ نوبت بعدی رو صادر کن
             </button>
         </form>
+
         <div id="lastIssued" class="mt-4 text-center hidden">
             <div class="text-muted text-xs mb-1">آخرین نوبت صادرشده</div>
             <div class="text-5xl font-extrabold text-blue-accent" id="lastNumber">—</div>
+            <div class="text-xs text-muted mt-1" id="lastDate"></div>
         </div>
     </div>
 
     <!-- صف -->
     <div class="md:col-span-1 glass p-6">
-        <h2 class="text-lg font-bold mb-3">📋 صف در انتظار</h2>
+        <div class="flex justify-between items-center mb-3">
+            <h2 class="text-lg font-bold">📋 صف در انتظار</h2>
+            <select id="viewDateSelect" class="input-dark p-1 rounded text-xs">
+                <option value="{{ today }}">امروز</option>
+                {% for d in available_dates %}
+                {% if d != today %}
+                <option value="{{ d }}">{{ d }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+        </div>
         <div id="queueList" class="max-h-96 overflow-y-auto"></div>
     </div>
 
@@ -86,9 +118,22 @@
 <script>
     registerAs('reception');
 
+    // تاریخ پیش‌فرض
+    const ticketDateInput = document.getElementById('ticketDate');
+    const dateSelect = document.getElementById('dateSelect');
+    const viewDateSelect = document.getElementById('viewDateSelect');
+
+    // انتخاب از dropdown → پر کردن input
+    dateSelect.addEventListener('change', () => {
+        if (dateSelect.value) ticketDateInput.value = dateSelect.value;
+    });
+
+    // صدور نوبت
     document.getElementById('issueForm').addEventListener('submit', (e) => {
         e.preventDefault();
-        socket.emit('issue_ticket', {});
+        const ticket_date = ticketDateInput.value;
+        if (!ticket_date) { toast('تاریخ را انتخاب کنید', 'err'); return; }
+        socket.emit('issue_ticket', { ticket_date });
     });
 
     socket.on('issue_ok', d => toast('✅ ' + d.msg, 'ok'));
@@ -96,6 +141,14 @@
     socket.on('ticket_issued', (d) => {
         document.getElementById('lastIssued').classList.remove('hidden');
         document.getElementById('lastNumber').textContent = toPersianDigits(d.number);
+        document.getElementById('lastDate').textContent = d.ticket_date;
+    });
+
+    // تغییر تاریخ مشاهده صف
+    viewDateSelect.addEventListener('change', () => {
+        fetch(`/api/stats?date=${viewDateSelect.value}`)
+            .then(r => r.json())
+            .then(s => { if (window.renderStats) window.renderStats(s); });
     });
 </script>
 </body>

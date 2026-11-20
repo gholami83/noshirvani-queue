@@ -18,16 +18,20 @@
         <p class="text-sm text-muted mt-1">{{ name }} — {{ uni }}</p>
     </div>
     <div class="text-left flex items-center gap-3">
-        <button id="ttsToggle" class="btn-outline rounded-full w-10 h-10 flex items-center justify-center text-lg" title="روشن/خاموش کردن صدا">🔊</button>
-        <button id="testAudioBtn" class="btn-outline rounded-full px-3 h-10 flex items-center justify-center text-xs" title="تست صدا">
-    🎵 تست صدا
-</button>
+        <select id="targetDate" class="input-dark p-2 rounded-lg text-sm">
+            <option value="{{ today }}">امروز ({{ today }})</option>
+            {% for d in available_dates %}
+            {% if d != today %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endif %}
+            {% endfor %}
+        </select>
+        <button id="ttsToggle" class="btn-outline rounded-full w-10 h-10 flex items-center justify-center text-lg" title="صدا">🔊</button>
         <div id="liveClock" class="text-lg md:text-xl font-bold text-blue-accent">--:--:--</div>
         <a href="/logout" class="text-xs text-muted hover:opacity-80">خروج</a>
     </div>
 </header>
 
-<!-- کارت اصلی -->
 <section class="relative z-10 mb-6">
     <div class="big-ticket-card">
         <div class="big-ticket-label">نوبت در حال رسیدگی</div>
@@ -45,7 +49,6 @@
     </div>
 </section>
 
-<!-- آمار -->
 <section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 relative z-10">
     <div class="glass p-4">
         <div class="text-muted text-xs mb-1">در انتظار</div>
@@ -65,7 +68,6 @@
     </div>
 </section>
 
-<!-- پایین: صف + باجه‌ها -->
 <div class="grid md:grid-cols-2 gap-4 relative z-10 pb-8">
     <div class="glass p-5">
         <h2 class="text-base font-bold mb-3">📋 صف در انتظار</h2>
@@ -88,14 +90,30 @@
 <script>
     const COUNTER_ID = {{ counter_id }};
     window.myCounterId = COUNTER_ID;
-
     registerAs('counter', COUNTER_ID);
 
+    const targetDate = document.getElementById('targetDate');
+    window.myTargetDate = targetDate.value;
+
+    targetDate.addEventListener('change', () => {
+        window.myTargetDate = targetDate.value;
+        // درخواست آمار برای تاریخ جدید
+        fetch(`/api/stats?date=${window.myTargetDate}`)
+            .then(r => r.json())
+            .then(s => { if (window.renderStats) window.renderStats(s); });
+    });
+
     document.getElementById('callNextBtn').onclick = () =>
-        socket.emit('call_next', { counter_id: COUNTER_ID });
+        socket.emit('call_next', { 
+            counter_id: COUNTER_ID, 
+            target_date: window.myTargetDate 
+        });
 
     document.getElementById('finishBtn').onclick = () =>
-        socket.emit('finish_current', { counter_id: COUNTER_ID });
+        socket.emit('finish_current', { 
+            counter_id: COUNTER_ID, 
+            target_date: window.myTargetDate 
+        });
 </script>
 </body>
 </html>

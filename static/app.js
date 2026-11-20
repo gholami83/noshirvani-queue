@@ -23,119 +23,31 @@ function updateThemeBtn(theme) {
 })();
 
 // ═══════════════════════════════════════════════════════════
-//                صدای اعلام — نسخه بانکی
+//                صدا — صف اعلان قفل‌دار
 // ═══════════════════════════════════════════════════════════
 let ttsEnabled = localStorage.getItem('ttsEnabled') !== 'false';
 let audioUnlocked = false;
-let faVoice = null;
-let announceQueue = [];   // صف اعلان
-let isAnnouncing = false;
 
-// --- کشف صداها ---
-function loadVoices() {
-    if (!('speechSynthesis' in window)) return;
-    const voices = window.speechSynthesis.getVoices();
-    faVoice =
-        voices.find(v => v.lang === 'fa-IR') ||
-        voices.find(v => v.lang && v.lang.startsWith('fa')) ||
-        voices.find(v => v.lang === 'ar-SA') ||
-        voices.find(v => v.lang && v.lang.startsWith('ar')) ||
-        null;
-    console.log('🎙️ TTS:', voices.length, 'صدا | فارسی:', faVoice ? faVoice.name : '❌ نصب نیست');
-}
-if ('speechSynthesis' in window) {
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-}
-
-// --- آنلاک کردن صدا با اولین کلیک ---
 function unlockAudio() {
     if (audioUnlocked) return;
     audioUnlocked = true;
-    // یه utterance خالی که مرورگر رو آنلاک کنه
     try {
-        const u = new SpeechSynthesisUtterance(' ');
-        u.volume = 0.01;
-        window.speechSynthesis.speak(u);
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
         console.log('🔓 Audio unlocked');
     } catch (e) {}
-    // دینگ خالی هم آنلاک کن
-    playDing(0.01);
 }
 document.addEventListener('click', unlockAudio, { once: true });
 document.addEventListener('touchstart', unlockAudio, { once: true });
 document.addEventListener('keydown', unlockAudio, { once: true });
 
-// --- دینگ بانکی (Web Audio API — بدون فایل) ---
-let audioCtx = null;
-function getAudioCtx() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    return audioCtx;
-}
-function playDing(volume = 0.4) {
-    try {
-        const ctx = getAudioCtx();
-        if (ctx.state === 'suspended') ctx.resume();
-        const now = ctx.currentTime;
+// ─── صف اعلان ───
+let announceQueue = [];
+let isAnnouncing = false;
 
-        // دو بپ: یه دینگ دو نتی مثل بانک
-        [880, 1320].forEach((freq, i) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0, now + i * 0.15);
-            gain.gain.linearRampToValueAtTime(volume, now + i * 0.15 + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.35);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now + i * 0.15);
-            osc.stop(now + i * 0.15 + 0.4);
-        });
-    } catch (e) {
-        console.warn('Ding failed:', e);
-    }
-}
-
-// --- تبدیل عدد به فارسی ---
-function toPersianDigits(str) {
-    const map = { '0':'۰','1':'۱','2':'۲','3':'۳','4':'۴','5':'۵','6':'۶','7':'۷','8':'۸','9':'۹' };
-    return String(str).split('').map(c => map[c] || c).join('');
-}
-
-// --- گفتن یک متن با Promise ---
-function speak(text) {
-    return new Promise((resolve) => {
-        if (!('speechSynthesis' in window)) {
-            console.warn('speechSynthesis not supported');
-            return resolve();
-        }
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = 'fa-IR';
-        utter.rate = 0.85;
-        utter.pitch = 1.0;
-        utter.volume = 1.0;
-        if (faVoice) utter.voice = faVoice;
-
-        utter.onend = () => resolve();
-        utter.onerror = (e) => {
-            console.warn('Speech error:', e);
-            resolve();
-        };
-
-        window.speechSynthesis.speak(utter);
-        console.log('🗣️ Speaking:', text);
-    });
-}
-
-// --- صف اعلان (خیلی مهم برای دو نوبت پشت سر هم) ---
 function enqueueAnnounce(number, counterId) {
     if (!ttsEnabled) return;
-    const num = toPersianDigits(String(number));
-    const cid = toPersianDigits(String(counterId));
-    announceQueue.push({ number: num, counterId: cid });
+    announceQueue.push({ number, counterId });
     updateAnnounceQueueUI();
     processAnnounceQueue();
 }
@@ -149,18 +61,40 @@ async function processAnnounceQueue() {
         const item = announceQueue.shift();
         updateAnnounceQueueUI();
 
-        // ۱. دینگ
-        playDing(0.5);
-        await new Promise(r => setTimeout(r, 500)); // فاصله بعد از دینگ
+        // پخش دو بار — هر بار کامل صبر کن
+        await playTTS(item.number, item.counterId);
+        await sleep(1000);
+        await playTTS(item.number, item.counterId);
 
-        // ۲. اعلام صدا
-        const text = `نوبت ${item.number}، باجه شماره ${item.counterId}`;
-        await speak(text);
-
-        // ۳. فاصله بین دو اعلام
-        await new Promise(r => setTimeout(r, 400));
+        // مکث بین دو نوبت مختلف
+        if (announceQueue.length > 0) {
+            await sleep(700);
+        }
     }
     isAnnouncing = false;
+}
+
+function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+}
+
+function playTTS(number, counterId) {
+    return new Promise((resolve) => {
+        const url = `/tts/${number}/${counterId}`;
+        const audio = new Audio(url);
+        let resolved = false;
+        const done = () => { if (!resolved) { resolved = true; resolve(); } };
+        audio.onended = done;
+        audio.onerror = (e) => {
+            console.warn('TTS error:', e);
+            done();
+        };
+        audio.play().catch(e => {
+            console.warn('Play blocked:', e);
+            done();
+        });
+        setTimeout(done, 10000);
+    });
 }
 
 function updateAnnounceQueueUI() {
@@ -168,11 +102,8 @@ function updateAnnounceQueueUI() {
     if (el) el.textContent = toPersianDigits(String(announceQueue.length));
     const box = document.getElementById('announceQueueBox');
     if (box) {
-        if (announceQueue.length > 0) {
-            box.classList.remove('hidden');
-        } else {
-            box.classList.add('hidden');
-        }
+        if (announceQueue.length > 0) box.classList.remove('hidden');
+        else box.classList.add('hidden');
     }
 }
 
@@ -182,9 +113,8 @@ function toggleTTS() {
     toast(ttsEnabled ? '🔊 صدا فعال شد' : '🔇 صدا خاموش شد', 'ok');
     updateTTSBtn();
     if (!ttsEnabled) {
-        window.speechSynthesis.cancel();
         announceQueue = [];
-        isAnnouncing = false;
+        updateAnnounceQueueUI();
     }
 }
 
@@ -193,28 +123,22 @@ function updateTTSBtn() {
     if (btn) btn.textContent = ttsEnabled ? '🔊' : '🔇';
 }
 
-// تست صدا از پنل مجری
-async function testAnnounce() {
+function testAnnounce() {
     unlockAudio();
     toast('🔊 در حال تست صدا...', 'ok');
-    playDing(0.5);
-    await new Promise(r => setTimeout(r, 500));
-    if (faVoice) {
-        await speak('تست صدای اعلام نوبت');
-    } else {
-        toast('⚠️ صدای فارسی نصب نیست — از تنظیمات ویندوز فارسی اضافه کن', 'err');
-        await speak('Test announcement');
-    }
+    enqueueAnnounce('001', '1');
 }
 
 // ═══════════════════════════════════════════════════════════
 //                     Socket.IO
 // ═══════════════════════════════════════════════════════════
 const socket = io({
-    transports: ['websocket', 'polling'],
+    transports: ['websocket'],
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
+    pingInterval: 25000,
+    pingTimeout: 60000,
 });
 
 let myRole = null;
@@ -236,6 +160,9 @@ function registerAs(role, counterId = null) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════
+//                     ابزارهای کمکی
+// ═══════════════════════════════════════════════════════════
 function startClock() {
     const el = document.getElementById('liveClock');
     if (!el) return;
@@ -252,10 +179,20 @@ function toast(msg, type = 'ok') {
     setTimeout(() => t.remove(), 3200);
 }
 
+function toPersianDigits(str) {
+    const map = { '0':'۰','1':'۱','2':'۲','3':'۳','4':'۴','5':'۵','6':'۶','7':'۷','8':'۸','9':'۹' };
+    return String(str).split('').map(c => map[c] || c).join('');
+}
+
+function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el && val !== undefined && val !== null) el.textContent = toPersianDigits(String(val));
+}
+
 // ═══════════════════════════════════════════════════════════
-//                 دریافت آمار — همه نقش‌ها
+//                 دریافت آمار
 // ═══════════════════════════════════════════════════════════
-socket.on('stats_update', (s) => {
+function renderStats(s) {
     setText('waiting_count', s.waiting_count);
     setText('serving_count', s.serving_count);
     setText('served_total', s.served_total);
@@ -263,7 +200,6 @@ socket.on('stats_update', (s) => {
     setText('online_announcer', s.online_announcers);
     setText('online_counter', s.online_counters);
 
-    // جدول باجه‌ها
     const container = document.getElementById('countersList');
     if (container) {
         container.innerHTML = s.counters.map(c => `
@@ -281,7 +217,6 @@ socket.on('stats_update', (s) => {
         `).join('');
     }
 
-    // صف در انتظار
     const qList = document.getElementById('queueList');
     if (qList) {
         if (!s.waiting_list.length) {
@@ -300,7 +235,6 @@ socket.on('stats_update', (s) => {
         }
     }
 
-    // باجه: نوبت فعال من
     if (window.myCounterId && s.counters) {
         const me = s.counters.find(c => c.id === window.myCounterId);
         const el = document.getElementById('myCurrent');
@@ -317,7 +251,6 @@ socket.on('stats_update', (s) => {
         }
     }
 
-    // مجری: نوبت بزرگ
     const bigCurrent = document.getElementById('bigCurrent');
     if (bigCurrent) {
         const active = s.counters.find(c => c.current_ticket);
@@ -326,22 +259,27 @@ socket.on('stats_update', (s) => {
         const bigCounter = document.getElementById('bigCounter');
         if (bigCounter) bigCounter.textContent = active ? `باجه شماره ${toPersianDigits(active.id)}` : '';
     }
+}
+window.renderStats = renderStats;
+
+socket.on('stats_update', (s) => {
+    renderStats(s);
 });
 
 // ═══════════════════════════════════════════════════════════
-//              وقتی نوبتی صدا زده شد — مهم‌ترین بخش
+//              وقتی نوبتی صدا زده شد
 // ═══════════════════════════════════════════════════════════
 socket.on('ticket_called', (data) => {
     const num = toPersianDigits(data.ticket.number);
     const cid = toPersianDigits(data.counter_id);
     toast(`🔔 نوبت ${num} → باجه ${cid}`, 'ok');
 
-    // مجری و باجه: صدا + صف اعلان
-    if (myRole === 'announcer' || myRole === 'counter') {
+    // ✅ فقط پذیرش صدا رو پخش کنه (باجه و مجری فقط Toast)
+    if (myRole === 'reception') {
         enqueueAnnounce(data.ticket.number, data.counter_id);
     }
 
-    // مجری: اضافه به تاریخچه اعلان‌ها
+    // مجری: تاریخچه اعلان‌ها
     if (myRole === 'announcer') {
         addToAnnounceHistory(data.ticket.number, data.counter_id, data.timestamp);
     }
@@ -350,16 +288,18 @@ socket.on('ticket_called', (data) => {
 function addToAnnounceHistory(number, counterId, timestamp) {
     const list = document.getElementById('announceHistory');
     if (!list) return;
+    if (list.children.length === 1 && list.children[0].classList.contains('text-muted')) {
+        list.innerHTML = '';
+    }
     const item = document.createElement('div');
     item.className = 'flex justify-between items-center p-2 rounded-lg mb-1 text-sm';
     item.style.background = 'var(--surface-hover)';
     item.innerHTML = `
         <span class="font-bold text-blue-accent text-lg">${toPersianDigits(number)}</span>
         <span class="text-muted">باجه ${toPersianDigits(counterId)}</span>
-        <span class="text-muted text-xs">${toPersianDigits(timestamp)}</span>
+        <span class="text-muted text-xs">${toPersianDigits(timestamp || '')}</span>
     `;
     list.prepend(item);
-    // فقط ۱۵ تای آخر
     while (list.children.length > 15) {
         list.removeChild(list.lastChild);
     }
@@ -367,11 +307,6 @@ function addToAnnounceHistory(number, counterId, timestamp) {
 
 socket.on('finish_ok', (d) => toast(d.msg, 'ok'));
 socket.on('error_msg', (d) => toast(d.msg, 'err'));
-
-function setText(id, val) {
-    const el = document.getElementById(id);
-    if (el && val !== undefined && val !== null) el.textContent = toPersianDigits(String(val));
-}
 
 // ═══════════════════════════════════════════════════════════
 //                     راه‌اندازی
